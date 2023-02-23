@@ -88,7 +88,7 @@ def check_response(response):
         raise TypeError
     if not isinstance(resp, list):
         raise TypeError
-    return resp[0]        
+    return resp[0]
 
 
 def parse_status(homework):
