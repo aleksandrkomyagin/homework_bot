@@ -88,7 +88,7 @@ def check_response(response):
         raise TypeError
     if not isinstance(resp, list):
         raise TypeError
-    return resp[0]
+    return resp[0]        
 
 
 def parse_status(homework):
@@ -113,7 +113,7 @@ def main():
     timestamp = int(time.time())
     while True:
         try:
-            response = get_api_answer(0)
+            response = get_api_answer(timestamp)
             check_resp = check_response(response)
             message = parse_status(check_resp)
             if message:
