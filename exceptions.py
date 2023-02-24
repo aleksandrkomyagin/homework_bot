@@ -1,6 +1,3 @@
-from requests.exceptions import RequestException
-
-
 class KeyError(Exception):
     """Ошибка при извлечении элемента по ключу."""
 

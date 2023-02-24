@@ -42,15 +42,18 @@ logger.addHandler(handler)
 
 def check_tokens():
     """Проверяет доступность переменных окружения."""
-    all_tokens = ('PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID')
-    missing_tokens = [token for token in all_tokens if globals()[token] is None]
+    logger.debug('Проверяю токены.')
+    tokens = ('PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID')
+    missing_tokens = [token for token in tokens if globals()[token] is None]
     if missing_tokens:
         logger.critical(f'Программа останолена. Нет токена: {missing_tokens}')
         sys.exit()
+    logger.debug('Все токены а месте.')
 
 
 def send_message(bot, message):
     """Отправляет сообщение в Telegram чат."""
+    logger.debug('Попытался отправить сообщение.')
     try:
         bot.send_message(
             chat_id=TELEGRAM_CHAT_ID,
