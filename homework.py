@@ -1,13 +1,15 @@
-import logging
-import requests
-import os
-import telegram
-import sys
-import exceptions
 import json
-
-from dotenv import load_dotenv
+import logging
+import os
+import sys
 import time
+from http import HTTPStatus
+
+import requests
+import telegram
+from dotenv import load_dotenv
+
+import exceptions
 
 load_dotenv()
 
@@ -27,23 +29,24 @@ HOMEWORK_VERDICTS = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
-logging.basicConfig(
-    format='%(asctime)s, %(levelname)s, %(name)s, %(message)s'
-)
+
+format = logging.Formatter('%(asctime)s, %(levelname)s, %(name)s, %(message)s')
+
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 handler = logging.StreamHandler(stream=sys.stdout)
+handler.setFormatter(format)
+handler.setLevel(logging.DEBUG)
 logger.addHandler(handler)
 
 
 def check_tokens():
     """Проверяет доступность переменных окружения."""
-    all_tokens = all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
-    if not all_tokens:
-        logger.critical(msg='Отсутствуют обязательные токены')
+    all_tokens = ('PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID')
+    missing_tokens = [token for token in all_tokens if globals()[token] is None]
+    if missing_tokens:
+        logger.critical(f'Программа останолена. Нет токена: {missing_tokens}')
         sys.exit()
-    return all_tokens
 
 
 def send_message(bot, message):
@@ -53,57 +56,59 @@ def send_message(bot, message):
             chat_id=TELEGRAM_CHAT_ID,
             text=message
         )
-        logger.debug(msg='Сообщение отправлено')
     except telegram.TelegramError as error:
         msg = f'Сообщение не отправлено: {error}'
         logger.error(msg)
+    logger.debug(msg='Сообщение отправлено')
 
 
 def get_api_answer(timestamp):
     """Делает запрос к эндпоинту API-сервиса."""
-    timestamp = {'from_date': timestamp}
+    logger.debug('Отправлен запрос к API.')
+    params = {'from_date': timestamp}
     try:
-        response = requests.get(ENDPOINT, headers=HEADERS, params=timestamp)
-        if response.status_code != 200:
-            code_api_msg = (
-                f'Эндпоинт {ENDPOINT} недоступен.'
-                f'Код ответа API: {response.status_code}')
-            logger.error(code_api_msg)
-            raise exceptions.StatusCode(code_api_msg)
-        try:
-            return response.json()
-        except json.decoder.JSONDecodeError:
-            pass
+        response = requests.get(ENDPOINT, headers=HEADERS, params=params)
     except requests.RequestException as request_error:
-        code_api_msg = f'Код ответа API (RequestException): {request_error}'
-        logger.error(code_api_msg)
+        code_api_msg = f'Ошибка при отправке запроса к API: {request_error}'
+        raise ConnectionError(code_api_msg)
+    logger.debug('Запрос успешный. Ответ получен.')
+    if response.status_code != HTTPStatus.OK:
+        code_api_msg = (
+            f'Эндпоинт {ENDPOINT} недоступен.'
+            f'Код ответа API: {response.status_code}')
+        raise exceptions.StatusCode(code_api_msg)
+    try:
+        return response.json()
+    except json.decoder.JSONDecodeError:
+        raise json.decoder.JSONDecodeError(
+            'Ошибка с приведением к нужному типу данных'
+        )
 
 
 def check_response(response):
     """Проверяет ответ API на соответствие документации."""
+    logger.debug('Началасть проверка полученного ответа.')
     if not isinstance(response, dict):
-        raise TypeError
+        raise TypeError('Ошибка типа данных')
     resp = response.get('homeworks')
     if resp is None:
-        raise TypeError
+        raise TypeError('Ошибка типа данных')
     if not isinstance(resp, list):
-        raise TypeError
-    return resp[0]
+        raise TypeError('Ошибка типа данных')
+    return resp
 
 
 def parse_status(homework):
     """Извлекает статус домашней работы."""
-    temp = ''
+    logger.debug('Началасть проверка статуса домашней работы.')
+    if 'homework_name' not in homework.keys():
+        raise KeyError("KeyError('homework_name')")
+    homework_name = homework.get('homework_name')
     status = homework.get('status')
-    if status != temp:
-        if status not in ('reviewing', 'approved', 'rejected'):
-            raise exceptions.KeyError(f"KeyError({status})")
-        verdict = HOMEWORK_VERDICTS[homework['status']]
-        homework_name = homework.get('homework_name')
-        if homework_name is None:
-            raise exceptions.KeyError("KeyError('homework_name')")
-        return f'Изменился статус проверки работы "{homework_name}". {verdict}'
-    return False
+    if status not in HOMEWORK_VERDICTS.keys():
+        raise KeyError(f"KeyError({status})")
+    verdict = HOMEWORK_VERDICTS[homework['status']]
+    return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def main():
@@ -111,19 +116,32 @@ def main():
     check_tokens()
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
+    tmp_status = 'reviewing'
     while True:
         try:
             response = get_api_answer(timestamp)
             check_resp = check_response(response)
+            if len(check_resp) == 0:
+                msg = 'На проверке нет домашних работ'
+                logger.debug(msg)
+                send_message(bot, msg)
+                continue
+            else:
+                check_resp = check_resp[0]
+            status = check_resp['status']
+            if status != tmp_status:
+                msg = 'Изменений нет, ждем 10 минут и проверяем API'
+                logger.debug(msg)
+                send_message(bot, msg)
             message = parse_status(check_resp)
-            if message:
-                send_message(bot, message)
+            timestamp = response.get('current_date')
+            tmp_status = status
+            send_message(bot, message)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            print(message)
+            logger.critical(message)
         finally:
-            timestamp = response.get('current_date')
-        time.sleep(RETRY_PERIOD)
+            time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
