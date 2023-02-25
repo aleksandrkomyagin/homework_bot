@@ -111,7 +111,7 @@ def parse_status(homework):
     """Извлекает статус домашней работы."""
     logger.debug('Началасть проверка статуса домашней работы.')
     if 'homework_name' not in homework:
-        raise KeyError("KeyError('homework_name')")
+        raise KeyError("Не найден ключ('homework_name')")
     homework_name = homework.get('homework_name')
     status = homework.get('status')
     if status not in HOMEWORK_VERDICTS.keys():
@@ -128,32 +128,28 @@ def main():
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
     tmp_status = ''
-    message_error = ''
+    errors = True
     while True:
         try:
             response = get_api_answer(timestamp)
-            check_resp = check_response(response)
-            if not check_resp:
+            honeworks = check_response(response)
+            if not honeworks:
                 msg = 'На проверке нет домашних работ'
                 logger.debug(msg)
                 continue
-            check_resp = check_resp[0]
-            status = check_resp['status']
-            if status == tmp_status:
+            honework = honeworks[0]
+            message = parse_status(honework)
+            if message == tmp_status:
                 msg = 'Изменений нет, ждем 10 минут и проверяем API'
                 logger.debug(msg)
-                send_message(bot, msg)
                 continue
-            message = parse_status(check_resp)
-            timestamp = response.get('current_date')
-            if timestamp is None:
-                timestamp = datetime.now()
-            tmp_status = status
+            timestamp = response.get('current_date') or int(time.time())
+            tmp_status = message
             send_message(bot, message)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            if message != message_error:
-                message_error = message
+            if errors:
+                errors = False
                 send_message(bot, message)
             logger.critical(message)
         finally:
