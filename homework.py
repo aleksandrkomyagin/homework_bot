@@ -127,7 +127,6 @@ def main():
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
     tmp_status = ''
-    errors = True
     while True:
         try:
             response = get_api_answer(timestamp)
@@ -146,7 +145,7 @@ def main():
             tmp_status = message
             send_message(bot, message)
         except Exception as error:
-            if error != message:            
+            if error != message:
                 send_message(bot, f'Сбой в работе программы: {error}')
                 message = error
             logger.critical(message)
