@@ -145,11 +145,13 @@ def main():
             tmp_status = message
             send_message(bot, message)
         except Exception as error:
-            if error != message:
-                send_message(bot, f'Сбой в работе программы: {error}')
-                message = error
-            logger.critical(message)
+            message = f'Сбой в работе программы: {error}'
+            if message != tmp_status:
+                send_message(bot, message)
+                tmp_status = message
+            logger.error(message)
         finally:
+            print()
             time.sleep(RETRY_PERIOD)
 
 
