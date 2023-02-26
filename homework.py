@@ -36,7 +36,7 @@ format = logging.Formatter('%(asctime)s, %(levelname)s, %(name)s, %(message)s')
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(stream=sys.stdout)
 handler.setFormatter(format)
-handler.setLevel(logging.DEBUG)
+logger.setLevel(logging.DEBUG)
 logger.addHandler(handler)
 
 
@@ -93,7 +93,7 @@ def check_response(response):
     """Проверяет ответ API на соответствие документации."""
     logger.debug('Началасть проверка полученного ответа.')
     if not isinstance(response, dict):
-        raise TypeError('Ошибка типа данных. Вернулся не словарь.')
+        raise TypeError('Ошибка типа данных. API вернул не словарь.')
     resp = response.get('homeworks')
     if resp is None:
         raise TypeError(
@@ -101,7 +101,7 @@ def check_response(response):
         )
     if not isinstance(resp, list):
         raise TypeError(
-            'Ошибка типа данных. Коллекци домашних работ должна быть списком.'
+            'Ошибка типа данных. Коллекция домашних работ должна быть списком.'
         )
     return resp
 
@@ -146,10 +146,9 @@ def main():
             tmp_status = message
             send_message(bot, message)
         except Exception as error:
-            message = f'Сбой в работе программы: {error}'
-            if errors:
-                errors = False
-                send_message(bot, message)
+            if error != message:            
+                send_message(bot, f'Сбой в работе программы: {error}')
+                message = error
             logger.critical(message)
         finally:
             time.sleep(RETRY_PERIOD)
