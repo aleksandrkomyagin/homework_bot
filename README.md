@@ -18,7 +18,7 @@ git@github.com:aleksandrkomyagin/homework_bot.git
 ```
 Создать вирутальное окружение
 ```sh
-cd homework-bot/
+cd homework_bot/
 ```
 ```sh
 python -m venv venv
